@@ -1,14 +1,18 @@
 package com.skilltracker.dao;
 
 import com.skilltracker.model.Certification;
+import com.skilltracker.model.ExpiredCertificateView;
 import com.skilltracker.util.DBUtil;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
-public class CertificationDAO {
+public class CertificationDAO implements ICertificationDAO {
 
     // ---------------- ADD CERTIFICATION ----------------
+    @Override
     public void addCertification(Certification cert) throws SQLException {
 
         String sql =
@@ -34,7 +38,7 @@ public class CertificationDAO {
         }
     }
 
-    // ---------------- VIEW ALL STUDENTS (NO DUPLICATES) ----------------
+    // ---------------- VIEW ALL STUDENTS ----------------
     public void viewAllStudentDetails() throws SQLException {
 
         String sql =
@@ -68,28 +72,25 @@ public class CertificationDAO {
         }
     }
 
-    // ---------------- FIND STUDENT (BY ID OR NAME) ----------------
+    // ---------------- FIND STUDENT ----------------
     public void findStudent(String input) throws SQLException {
 
         String sql =
             "SELECT st.student_id, st.name, st.email, " +
-            "GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ',') AS skills, " +
-            "GROUP_CONCAT(DISTINCT c.certificate_name ORDER BY c.certificate_name SEPARATOR ',') AS certificates, " +
-            "GROUP_CONCAT(DISTINCT DATE_FORMAT(c.expiry_date, '%Y-%m-%d') " +
-            "ORDER BY c.expiry_date SEPARATOR ',') AS expiry_dates " +
+            "GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ', ') AS skills, " +
+            "c.certificate_name, c.expiry_date " +
             "FROM students st " +
             "LEFT JOIN certifications c ON st.student_id = c.student_id " +
             "LEFT JOIN skills s ON c.skill_id = s.skill_id " +
             "WHERE st.student_id = ? OR st.name LIKE ? " +
-            "GROUP BY st.student_id, st.name, st.email";
+            "GROUP BY st.student_id, st.name, st.email, c.certificate_name, c.expiry_date " +
+            "ORDER BY st.student_id, c.expiry_date";
 
         try (Connection con = DBUtil.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             int id = -1;
-            try {
-                id = Integer.parseInt(input);
-            } catch (NumberFormatException ignored) {}
+            try { id = Integer.parseInt(input); } catch (Exception ignored) {}
 
             ps.setInt(1, id);
             ps.setString(2, "%" + input + "%");
@@ -101,55 +102,40 @@ public class CertificationDAO {
                     return;
                 }
 
-                int studentId = rs.getInt("student_id");
-                String name = rs.getString("name");
-                String email = rs.getString("email");
+                // HEADER
+                System.out.printf(
+                	    "%-4s %-12s %-25s %-18s %-35s %-12s%n",
+                	    "ID", "NAME", "EMAIL", "SKILL", "CERTIFICATION", "EXPIRY"
+                	);
 
-                String[] skills =
-                    rs.getString("skills") != null
-                        ? rs.getString("skills").split(",")
-                        : new String[] {"-"};
 
-                String[] certs =
-                    rs.getString("certificates") != null
-                        ? rs.getString("certificates").split(",")
-                        : new String[] {"-"};
+                int lastStudentId = -1;
 
-                String[] expiries =
-                    rs.getString("expiry_dates") != null
-                        ? rs.getString("expiry_dates").split(",")
-                        : new String[] {"-"};
+                do {
+                    int currentId = rs.getInt("student_id");
 
-                int rows =
-                    Math.max(skills.length,
-                    Math.max(certs.length, expiries.length));
+                    String idCol     = (currentId != lastStudentId) ? String.valueOf(currentId) : "";
+                    String nameCol   = (currentId != lastStudentId) ? rs.getString("name") : "";
+                    String emailCol  = (currentId != lastStudentId) ? rs.getString("email") : "";
+                    String skillCol  = (currentId != lastStudentId) ? rs.getString("skills") : "";
 
-                System.out.println(
-                	    "\nID   Name                 Email                          Skills                  Certification                  Expiry Date");
-                	System.out.println(
-                	    "---------------------------------------------------------------------------------------------------------------");
+                    String certCol   = rs.getString("certificate_name");
+                    Date expDate     = rs.getDate("expiry_date");
 
-                	for (int i = 0; i < rows; i++) {
+                    System.out.printf(
+                    	    "%-4d %-12s %-25s %-18s %-35s %-12s%n",
+                    	    rs.getInt("student_id"),
+                    	    rs.getString("name"),
+                    	    rs.getString("email"),
+                    	    rs.getString("skills"),
+                    	    rs.getString("certificate_name"),
+                    	    rs.getDate("expiry_date")
+                    	);
 
-                	    String idCol = (i == 0) ? String.valueOf(studentId) : "";
-                	    String nameCol = (i == 0) ? name : "";
-                	    String emailCol = (i == 0) ? email : "";
 
-                	    String skillCol = i < skills.length ? skills[i].trim() : "";
-                	    String certCol  = i < certs.length  ? certs[i].trim()  : "-";
-                	    String expCol   = i < expiries.length ? expiries[i].trim() : "";
+                    lastStudentId = currentId;
 
-                	    System.out.printf(
-                	        "%-4s %-20s %-30s %-22s %-30s %-12s%n",
-                	        idCol,
-                	        nameCol,
-                	        emailCol,
-                	        skillCol,
-                	        certCol,
-                	        expCol
-                	    );
-                	}
-
+                } while (rs.next());
             }
         }
     }
@@ -178,38 +164,110 @@ public class CertificationDAO {
             ps.executeUpdate();
         }
     }
-    
- // 🔥 VIEW EXPIRED CERTIFICATES
-    public void viewExpiredCertificates() throws SQLException {
+
+ // ---------------- EXPIRED CERTIFICATES (SERVICE USES THIS) ----------------
+    @Override
+    public List<ExpiredCertificateView> getExpiredCertificates() throws SQLException {
 
         String sql =
-          "SELECT st.student_id, st.name, s.skill_name, " +
-          "c.certificate_name, c.expiry_date " +
-          "FROM certifications c " +
-          "JOIN students st ON c.student_id = st.student_id " +
-          "JOIN skills s ON c.skill_id = s.skill_id " +
-          "WHERE c.expiry_date < CURRENT_DATE " +
-          "ORDER BY c.expiry_date";
+            "SELECT st.student_id, st.name, s.skill_name, " +
+            "c.certificate_name, c.expiry_date " +
+            "FROM certifications c " +
+            "JOIN students st ON c.student_id = st.student_id " +
+            "JOIN skills s ON c.skill_id = s.skill_id " +
+            "WHERE c.expiry_date < CURRENT_DATE " +
+            "ORDER BY c.expiry_date";
+
+        List<ExpiredCertificateView> list = new ArrayList<>();
 
         try (Connection con = DBUtil.getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
-            System.out.printf(
-                "%-4s %-20s %-20s %-30s %-12s%n",
-                "ID", "Name", "Skill", "Certificate", "Expiry"
-            );
-
             while (rs.next()) {
-                System.out.printf(
-                    "%-4d %-20s %-20s %-30s %-12s%n",
+                list.add(new ExpiredCertificateView(
                     rs.getInt("student_id"),
                     rs.getString("name"),
                     rs.getString("skill_name"),
                     rs.getString("certificate_name"),
-                    rs.getDate("expiry_date")
-                );
+                    rs.getDate("expiry_date").toLocalDate()
+                ));
             }
         }
+        return list;
     }
+    
+    public void deleteByIdOrName(Integer id, String name1) {
+
+        String selectStudent =
+            "SELECT student_id FROM students WHERE student_id = ? OR name = ?";
+
+        String deleteCert =
+            "DELETE FROM certifications WHERE student_id = ?";
+
+        String deleteStudent =
+            "DELETE FROM students WHERE student_id = ?";
+
+        String deleteUnusedSkills =
+            "DELETE FROM skills " +
+            "WHERE skill_id NOT IN (SELECT DISTINCT skill_id FROM certifications)";
+
+        try (Connection con = DBUtil.getConnection()) {
+
+            con.setAutoCommit(false);
+
+            Integer studentId = null;
+
+            // 1️⃣ Find student first
+            try (PreparedStatement ps = con.prepareStatement(selectStudent)) {
+                ps.setObject(1, id);
+                ps.setObject(2, name1);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        studentId = rs.getInt("student_id");
+                    }
+                }
+            }
+
+            if (studentId == null) {
+                System.out.println("Student not found");
+                return;
+            }
+
+            // 2️⃣ Delete certifications
+            try (PreparedStatement ps = con.prepareStatement(deleteCert)) {
+                ps.setInt(1, studentId);
+                ps.executeUpdate();
+            }
+
+            // 3️⃣ Delete student
+            int rows;
+            try (PreparedStatement ps = con.prepareStatement(deleteStudent)) {
+                ps.setInt(1, studentId);
+                rows = ps.executeUpdate();
+            }
+
+            // 4️⃣ Delete unused skills (safe cleanup)
+            try (PreparedStatement ps = con.prepareStatement(deleteUnusedSkills)) {
+                ps.executeUpdate();
+            }
+
+            con.commit();
+
+            if (rows > 0) {
+                System.out.println("Student record deleted successfully");
+            }
+
+        } catch (Exception e) {
+            try {
+                DBUtil.getConnection().rollback();
+            } catch (Exception ignored) {}
+            System.out.println("Delete failed: " + e.getMessage());
+        }
+    }
+
+
+
+
 }
