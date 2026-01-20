@@ -73,9 +73,10 @@ public class CertificationDAO {
 
         String sql =
             "SELECT st.student_id, st.name, st.email, " +
-            "GROUP_CONCAT(DISTINCT s.skill_name SEPARATOR ', ') AS skills, " +
-            "GROUP_CONCAT(DISTINCT c.certificate_name SEPARATOR ', ') AS certificates, " +
-            "GROUP_CONCAT(DISTINCT DATE_FORMAT(c.expiry_date, '%Y-%m-%d') SEPARATOR ', ') AS expiry_dates " +
+            "GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ',') AS skills, " +
+            "GROUP_CONCAT(DISTINCT c.certificate_name ORDER BY c.certificate_name SEPARATOR ',') AS certificates, " +
+            "GROUP_CONCAT(DISTINCT DATE_FORMAT(c.expiry_date, '%Y-%m-%d') " +
+            "ORDER BY c.expiry_date SEPARATOR ',') AS expiry_dates " +
             "FROM students st " +
             "LEFT JOIN certifications c ON st.student_id = c.student_id " +
             "LEFT JOIN skills s ON c.skill_id = s.skill_id " +
@@ -100,16 +101,59 @@ public class CertificationDAO {
                     return;
                 }
 
-                System.out.println("\n--- Student Details ---");
-                System.out.println("ID            : " + rs.getInt("student_id"));
-                System.out.println("Name          : " + rs.getString("name"));
-                System.out.println("Email         : " + rs.getString("email"));
-                System.out.println("Skills        : " + rs.getString("skills"));
-                System.out.println("Certifications: " + rs.getString("certificates"));
-                System.out.println("Expiry Dates  : " + rs.getString("expiry_dates"));
+                int studentId = rs.getInt("student_id");
+                String name = rs.getString("name");
+                String email = rs.getString("email");
+
+                String[] skills =
+                    rs.getString("skills") != null
+                        ? rs.getString("skills").split(",")
+                        : new String[] {"-"};
+
+                String[] certs =
+                    rs.getString("certificates") != null
+                        ? rs.getString("certificates").split(",")
+                        : new String[] {"-"};
+
+                String[] expiries =
+                    rs.getString("expiry_dates") != null
+                        ? rs.getString("expiry_dates").split(",")
+                        : new String[] {"-"};
+
+                int rows =
+                    Math.max(skills.length,
+                    Math.max(certs.length, expiries.length));
+
+                System.out.println(
+                	    "\nID   Name                 Email                          Skills                  Certification                  Expiry Date");
+                	System.out.println(
+                	    "---------------------------------------------------------------------------------------------------------------");
+
+                	for (int i = 0; i < rows; i++) {
+
+                	    String idCol = (i == 0) ? String.valueOf(studentId) : "";
+                	    String nameCol = (i == 0) ? name : "";
+                	    String emailCol = (i == 0) ? email : "";
+
+                	    String skillCol = i < skills.length ? skills[i].trim() : "";
+                	    String certCol  = i < certs.length  ? certs[i].trim()  : "-";
+                	    String expCol   = i < expiries.length ? expiries[i].trim() : "";
+
+                	    System.out.printf(
+                	        "%-4s %-20s %-30s %-22s %-30s %-12s%n",
+                	        idCol,
+                	        nameCol,
+                	        emailCol,
+                	        skillCol,
+                	        certCol,
+                	        expCol
+                	    );
+                	}
+
             }
         }
     }
+
 
     // ---------------- UPDATE EXPIRY ----------------
     public void updateCertificationExpiry(
