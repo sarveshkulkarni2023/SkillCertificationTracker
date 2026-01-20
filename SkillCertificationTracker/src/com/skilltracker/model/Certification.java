@@ -4,16 +4,20 @@ import java.time.LocalDate;
 
 public class Certification {
 
-    private int certId;
     private int studentId;
     private int skillId;
+    private String certificateName;
     private LocalDate issueDate;
     private LocalDate expiryDate;
 
     public Certification(int studentId, int skillId,
-                          LocalDate issueDate, LocalDate expiryDate) {
+                         String certificateName,
+                         LocalDate issueDate,
+                         LocalDate expiryDate) {
+
         this.studentId = studentId;
         this.skillId = skillId;
+        this.certificateName = certificateName;
         this.issueDate = issueDate;
         this.expiryDate = expiryDate;
     }
@@ -24,6 +28,10 @@ public class Certification {
 
     public int getSkillId() {
         return skillId;
+    }
+
+    public String getCertificateName() {
+        return certificateName;
     }
 
     public LocalDate getIssueDate() {

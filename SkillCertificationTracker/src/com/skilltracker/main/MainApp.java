@@ -55,6 +55,9 @@ public class MainApp {
                             int skillId =
                                 skillDAO.getOrCreateSkill(skillName);
 
+                            System.out.print("Certificate name: ");
+                            String certName = sc.nextLine();
+
                             System.out.print("Expiry (yyyy-mm-dd): ");
                             LocalDate expiry =
                                 LocalDate.parse(sc.nextLine());
@@ -63,12 +66,14 @@ public class MainApp {
                                 new Certification(
                                     studentId,
                                     skillId,
+                                    certName,
                                     LocalDate.now(),
                                     expiry
                                 );
 
                             service.assignCertification(cert);
                         }
+
 
                         System.out.println("Student added successfully");
                         break;
