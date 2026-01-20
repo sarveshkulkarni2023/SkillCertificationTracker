@@ -22,10 +22,10 @@ public class MainApp {
 
         while (true) {
 
-            System.out.println("\n1.Add Student (with Skills & Certification)");
+            System.out.println("\n1.Add Student");
             System.out.println("2.View All Students");
-            System.out.println("3.Update Certification Expiry");
-            System.out.println("4.Find Student (by ID or Name)");
+            System.out.println("3.Update Certification");
+            System.out.println("4.Find a Student");
             System.out.println("5.Exit");
             System.out.print("Choice: ");
 
