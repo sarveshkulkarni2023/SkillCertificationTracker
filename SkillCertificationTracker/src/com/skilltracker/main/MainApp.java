@@ -82,6 +82,10 @@ public class MainApp {
                             String skillName = sc.nextLine();
                             skillIds[i] = skillDAO.getOrCreateSkill(skillName);
                         }
+                        System.out.println("Are you want to enter the certificates 1/0");
+                        Scanner s=new Scanner (System.in);
+                        int n=s.nextInt();
+                        if(n==1){
 
                         // ---------- CERTIFICATIONS ----------
                         int certCount;
@@ -127,8 +131,10 @@ public class MainApp {
                             // SERVICE call (correct)
                             certService.issueCertification(cert);
                         }
-
                         System.out.println("Student, skills, and certifications added.");
+                        }
+                        System.out.println("Student, skills added.");
+                     
                         break;
 
                     // ---------- VIEW ALL STUDENTS ----------
@@ -141,8 +147,8 @@ public class MainApp {
                         System.out.print("Student ID: ");
                         int sid = sc.nextInt();
 
-                        System.out.print("Skill ID: ");
-                        int skid = sc.nextInt();
+                        System.out.print("Certificate Name: ");
+                        String certificate_name= sc.nextLine();
                         sc.nextLine();
 
                         System.out.print("New Expiry (yyyy-mm-dd) [Enter to remove]: ");
@@ -151,7 +157,7 @@ public class MainApp {
                         LocalDate newExpiry =
                                 input.isEmpty() ? null : LocalDate.parse(input);
 
-                        certDAO.updateCertificationExpiry(sid, skid, newExpiry);
+                        certDAO.updateCertificationExpiry(sid, certificate_name, newExpiry);
                         System.out.println("Expiry updated.");
                         break;
 

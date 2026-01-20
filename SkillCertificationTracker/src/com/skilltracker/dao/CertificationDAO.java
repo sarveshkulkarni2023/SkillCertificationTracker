@@ -143,12 +143,12 @@ public class CertificationDAO implements ICertificationDAO {
 
     // ---------------- UPDATE EXPIRY ----------------
     public void updateCertificationExpiry(
-            int studentId, int skillId, LocalDate newExpiry)
+            int studentId, String certificate_name, LocalDate newExpiry)
             throws SQLException {
 
         String sql =
             "UPDATE certifications SET expiry_date=? " +
-            "WHERE student_id=? AND skill_id=?";
+            "WHERE student_id=? AND certificate_name=?";
 
         try (Connection con = DBUtil.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -160,7 +160,7 @@ public class CertificationDAO implements ICertificationDAO {
             }
 
             ps.setInt(2, studentId);
-            ps.setInt(3, skillId);
+            ps.setString(3, certificate_name);
             ps.executeUpdate();
         }
     }
@@ -266,8 +266,4 @@ public class CertificationDAO implements ICertificationDAO {
             System.out.println("Delete failed: " + e.getMessage());
         }
     }
-
-
-
-
 }
