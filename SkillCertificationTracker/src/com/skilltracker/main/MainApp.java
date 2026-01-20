@@ -1,8 +1,12 @@
 package com.skilltracker.main;
 
-import com.skilltracker.dao.*;
-import com.skilltracker.exception.*;
-import com.skilltracker.model.*;
+import com.skilltracker.dao.CertificationDAO;
+import com.skilltracker.dao.SkillDAO;
+import com.skilltracker.dao.StudentDAO;
+import com.skilltracker.exception.DuplicateSkillException;
+import com.skilltracker.exception.ExpiredCertificationException;
+import com.skilltracker.model.Certification;
+import com.skilltracker.model.Student;
 import com.skilltracker.service.CertificationService;
 
 import java.sql.SQLException;
@@ -19,15 +23,26 @@ public class MainApp {
         SkillDAO skillDAO = new SkillDAO();
         CertificationDAO certDAO = new CertificationDAO();
         CertificationService service = new CertificationService();
+        CertificationDAO certDAO = new CertificationDAO();
 
         while (true) {
 
+<<<<<<< Updated upstream
             System.out.println("\n1.Add Student");
             System.out.println("2.View All Students");
             System.out.println("3.Update Certification");
             System.out.println("4.Find a Student");
             System.out.println("5.View Expired Certificates");
             System.out.println("6.Exit");
+=======
+            System.out.println("\n===== SKILL TRACKER MENU =====");
+            System.out.println("1. Add Student (with Skills & Certification)");
+            System.out.println("2. View All Students");
+            System.out.println("3. Update Certification Expiry");
+            System.out.println("5. Exit");
+            System.out.println("6. View Expired Certificates");
+           
+>>>>>>> Stashed changes
             System.out.print("Choice: ");
 
             int choice = sc.nextInt();
@@ -45,8 +60,8 @@ public class MainApp {
                         String email = sc.nextLine();
 
                         int studentId =
-                            studentDAO.addStudentAndReturnId(
-                                new Student(name, email));
+                                studentDAO.addStudentAndReturnId(
+                                        new Student(name, email));
 
                         int count;
                         do {
@@ -61,11 +76,12 @@ public class MainApp {
                             String skillName = sc.nextLine();
 
                             int skillId =
-                                skillDAO.getOrCreateSkill(skillName);
+                                    skillDAO.getOrCreateSkill(skillName);
 
                             System.out.print("Certificate name: ");
                             String certName = sc.nextLine();
 
+<<<<<<< Updated upstream
                             LocalDate expiry = null;
                             System.out.print(
                                 "Expiry (yyyy-mm-dd) [Press Enter to skip]: ");
@@ -87,15 +103,20 @@ public class MainApp {
                                     }
                                 }
                             }
+=======
+                            System.out.print("Expiry (yyyy-mm-dd): ");
+                            LocalDate expiry =
+                                    LocalDate.parse(sc.nextLine());
+>>>>>>> Stashed changes
 
                             Certification cert =
-                                new Certification(
-                                    studentId,
-                                    skillId,
-                                    certName,
-                                    LocalDate.now(),
-                                    expiry
-                                );
+                                    new Certification(
+                                            studentId,
+                                            skillId,
+                                            certName,
+                                            LocalDate.now(),
+                                            expiry
+                                    );
 
                             service.assignCertification(cert);
                         }
@@ -112,10 +133,12 @@ public class MainApp {
                     case 3:
                         System.out.print("Student ID: ");
                         int sid = sc.nextInt();
+
                         System.out.print("Skill ID: ");
                         int skid = sc.nextInt();
                         sc.nextLine();
 
+<<<<<<< Updated upstream
                         LocalDate newExpiry = null;
                         System.out.print(
                             "New Expiry (yyyy-mm-dd) [Press Enter to remove]: ");
@@ -144,18 +167,37 @@ public class MainApp {
                     // -------- EXIT --------
                     case 6:
                         System.out.println("Exiting...");
+=======
+                        System.out.print("New Expiry (yyyy-mm-dd): ");
+                        LocalDate newExp =
+                                LocalDate.parse(sc.nextLine());
+
+                        certDAO.updateCertificationExpiry(sid, skid, newExp);
+                        System.out.println("Expiry updated successfully");
+                        break;
+
+                    case 6:
+                        certDAO.viewExpiredCertificates();
+                        break;
+
+                    case 5:
+                        System.out.println("Exiting application...");
+>>>>>>> Stashed changes
                         System.exit(0);
 
                     default:
-                        System.out.println("Invalid choice");
+                        System.out.println("Invalid choice. Try again.");
                 }
             }
             catch (DuplicateSkillException |
                    ExpiredCertificationException e) {
-                System.out.println(e.getMessage());
+                System.out.println("Error: " + e.getMessage());
             }
             catch (SQLException e) {
                 System.out.println("Database error: " + e.getMessage());
+            }
+            catch (Exception e) {
+                System.out.println("Unexpected error: " + e.getMessage());
             }
         }
     }

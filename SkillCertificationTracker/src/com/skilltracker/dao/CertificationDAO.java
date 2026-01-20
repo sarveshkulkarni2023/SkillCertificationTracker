@@ -178,8 +178,12 @@ public class CertificationDAO {
             ps.executeUpdate();
         }
     }
+<<<<<<< Updated upstream
     
     // 🔥 VIEW EXPIRED CERTIFICATES
+=======
+ // 🔥 VIEW EXPIRED CERTIFICATES
+>>>>>>> Stashed changes
     public void viewExpiredCertificates() throws SQLException {
 
         String sql =
@@ -212,4 +216,8 @@ public class CertificationDAO {
             }
         }
     }
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 }
