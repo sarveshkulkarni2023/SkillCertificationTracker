@@ -14,8 +14,10 @@ public class MainApp {
     public static void main(String[] args) {
 
         Scanner sc = new Scanner(System.in);
+
         StudentDAO studentDAO = new StudentDAO();
         SkillDAO skillDAO = new SkillDAO();
+        CertificationDAO certDAO = new CertificationDAO();
         CertificationService service = new CertificationService();
 
         while (true) {
@@ -23,7 +25,8 @@ public class MainApp {
             System.out.println("\n1.Add Student (with Skills & Certification)");
             System.out.println("2.View All Students");
             System.out.println("3.Update Certification Expiry");
-            System.out.println("4.Exit");
+            System.out.println("4.Find Student (by ID or Name)");
+            System.out.println("5.Exit");
             System.out.print("Choice: ");
 
             int choice = sc.nextInt();
@@ -32,6 +35,7 @@ public class MainApp {
             try {
                 switch (choice) {
 
+                    // -------- ADD STUDENT --------
                     case 1:
                         System.out.print("Name: ");
                         String name = sc.nextLine();
@@ -43,8 +47,11 @@ public class MainApp {
                             studentDAO.addStudentAndReturnId(
                                 new Student(name, email));
 
-                        System.out.print("Number of skills: ");
-                        int count = sc.nextInt();
+                        int count;
+                        do {
+                            System.out.print("Number of skills (min 1): ");
+                            count = sc.nextInt();
+                        } while (count <= 0);
                         sc.nextLine();
 
                         for (int i = 0; i < count; i++) {
@@ -58,9 +65,27 @@ public class MainApp {
                             System.out.print("Certificate name: ");
                             String certName = sc.nextLine();
 
-                            System.out.print("Expiry (yyyy-mm-dd): ");
-                            LocalDate expiry =
-                                LocalDate.parse(sc.nextLine());
+                            LocalDate expiry = null;
+                            System.out.print(
+                                "Expiry (yyyy-mm-dd) [Press Enter to skip]: ");
+                            String expInput = sc.nextLine();
+
+                            if (!expInput.isEmpty()) {
+                                while (true) {
+                                    try {
+                                        expiry = LocalDate.parse(expInput);
+                                        break;
+                                    } catch (Exception e) {
+                                        System.out.print(
+                                            "Invalid date. Re-enter or press Enter to skip: ");
+                                        expInput = sc.nextLine();
+                                        if (expInput.isEmpty()) {
+                                            expiry = null;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
 
                             Certification cert =
                                 new Certification(
@@ -74,14 +99,15 @@ public class MainApp {
                             service.assignCertification(cert);
                         }
 
-
                         System.out.println("Student added successfully");
                         break;
 
+                    // -------- VIEW ALL --------
                     case 2:
-                        new CertificationDAO().viewAllStudentDetails();
+                        certDAO.viewAllStudentDetails();
                         break;
 
+                    // -------- UPDATE EXPIRY --------
                     case 3:
                         System.out.print("Student ID: ");
                         int sid = sc.nextInt();
@@ -89,16 +115,30 @@ public class MainApp {
                         int skid = sc.nextInt();
                         sc.nextLine();
 
-                        System.out.print("New Expiry (yyyy-mm-dd): ");
-                        LocalDate newExp =
-                            LocalDate.parse(sc.nextLine());
+                        LocalDate newExpiry = null;
+                        System.out.print(
+                            "New Expiry (yyyy-mm-dd) [Press Enter to remove]: ");
+                        String input = sc.nextLine();
 
-                        new CertificationDAO()
-                            .updateCertificationExpiry(sid, skid, newExp);
+                        if (!input.isEmpty()) {
+                            newExpiry = LocalDate.parse(input);
+                        }
+
+                        certDAO.updateCertificationExpiry(
+                            sid, skid, newExpiry);
+
                         System.out.println("Expiry updated");
                         break;
 
+                    // -------- FIND STUDENT --------
                     case 4:
+                        System.out.print("Enter Student ID or Name: ");
+                        String search = sc.nextLine();
+                        certDAO.findStudent(search);
+                        break;
+
+                    // -------- EXIT --------
+                    case 5:
                         System.out.println("Exiting...");
                         System.exit(0);
 
