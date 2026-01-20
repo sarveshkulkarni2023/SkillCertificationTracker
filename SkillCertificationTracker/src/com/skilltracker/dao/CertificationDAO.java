@@ -266,4 +266,110 @@ public class CertificationDAO implements ICertificationDAO {
             System.out.println("Delete failed: " + e.getMessage());
         }
     }
+    private Integer getStudentId(Connection con, Integer id, String name) throws SQLException {
+
+        String sql = "SELECT student_id FROM students WHERE student_id = ? OR name = ?";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setObject(1, id);
+            ps.setObject(2, name);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("student_id");
+                }
+            }
+        }
+        return null;
+    }
+    private int getOrCreateSkill(Connection con, String skillName) throws SQLException {
+
+        String select = "SELECT skill_id FROM skills WHERE skill_name = ?";
+        String insert = "INSERT INTO skills(skill_name) VALUES(?)";
+
+        try (PreparedStatement ps = con.prepareStatement(select)) {
+            ps.setString(1, skillName);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("skill_id");
+                }
+            }
+        }
+
+        try (PreparedStatement ps =
+                 con.prepareStatement(insert, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setString(1, skillName);
+            ps.executeUpdate();
+
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
+    }
+    public void addSkillsToStudent(Integer id, String name, List<String> skills)
+            throws SQLException {
+
+        try (Connection con = DBUtil.getConnection()) {
+
+            Integer studentId = getStudentId(con, id, name);
+            if (studentId == null) {
+                System.out.println("Student not found");
+                return;
+            }
+
+            for (String skill : skills) {
+                getOrCreateSkill(con, skill);
+            }
+
+            System.out.println("Skills added successfully");
+        }
+    }
+
+    public void addCertificatesToStudent(
+            Integer id, String name,
+            List<Certification> certs) throws SQLException {
+
+        String insert =
+            "INSERT INTO certifications " +
+            "(student_id, skill_id, certificate_name, issue_date, expiry_date) " +
+            "VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection con = DBUtil.getConnection()) {
+
+            con.setAutoCommit(false);
+
+            Integer studentId = getStudentId(con, id, name);
+            if (studentId == null) {
+                System.out.println("Student not found");
+                return;
+            }
+
+            for (Certification cert : certs) {
+
+                int skillId = getOrCreateSkill(con, cert.getCertificateName());
+
+                try (PreparedStatement ps = con.prepareStatement(insert)) {
+
+                    ps.setInt(1, studentId);
+                    ps.setInt(2, skillId);
+                    ps.setString(3, cert.getCertificateName());
+                    ps.setDate(4, Date.valueOf(LocalDate.now()));
+                    ps.setDate(5,
+                        cert.getExpiryDate() != null
+                            ? Date.valueOf(cert.getExpiryDate())
+                            : null
+                    );
+
+                    ps.executeUpdate();
+                }
+            }
+
+            con.commit();
+            System.out.println("Certificates added successfully");
+        }
+    }
+
 }

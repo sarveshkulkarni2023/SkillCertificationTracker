@@ -4,7 +4,6 @@ import com.skilltracker.dao.CertificationDAO;
 import com.skilltracker.dao.SkillDAO;
 import com.skilltracker.dao.StudentDAO;
 import com.skilltracker.exception.DataNotFoundException;
-import com.skilltracker.exception.DuplicateSkillException;
 import com.skilltracker.exception.ExpiredCertificationException;
 import com.skilltracker.model.Certification;
 import com.skilltracker.model.ExpiredCertificateView;
@@ -14,49 +13,46 @@ import com.skilltracker.service.CertificationServiceImpl;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-
 
 public class MainApp {
 
     public static void main(String[] args) throws ExpiredCertificationException {
-    	final String RED = "\u001B[31m";
-    	final String YELLOW = "\u001B[33m";
-    	final String RESET = "\u001B[0m";
 
-
-
+        final String RED = "\u001B[31m";
+        final String YELLOW = "\u001B[33m";
+        final String RESET = "\u001B[0m";
 
         Scanner sc = new Scanner(System.in);
 
-        // DAOs (existing, stable)
         StudentDAO studentDAO = new StudentDAO();
         SkillDAO skillDAO = new SkillDAO();
         CertificationDAO certDAO = new CertificationDAO();
-
-        // SERVICE (OOPS + Interface + Polymorphism)
         CertificationService certService = new CertificationServiceImpl();
 
         while (true) {
 
-            System.out.println("\n1. Add Student");
+            System.out.println("\n===== SKILL CERTIFICATION TRACKER =====");
+            System.out.println("1. Add Student");
             System.out.println("2. View All Students");
             System.out.println("3. Update Certification Expiry");
             System.out.println("4. Find a Student");
             System.out.println("5. View Expired Certificates");
-            System.out.println("6. Delete Record.");
-            System.out.println("7. Exit");
+            System.out.println("6. Delete Record");
+            System.out.println("7. Add Skill to Existing Student");
+            System.out.println("8. Add Certificate to Existing Student");
+            System.out.println("9. Exit");
 
             System.out.print("Choice: ");
-            int choice = sc.nextInt();
-            sc.nextLine();
+            int choice = Integer.parseInt(sc.nextLine());
 
             try {
                 switch (choice) {
 
-                    // ---------- ADD STUDENT ----------
-                    case 1:
+                    // -------- ADD STUDENT --------
+                    case 1 -> {
                         System.out.print("Name: ");
                         String name = sc.nextLine();
 
@@ -64,184 +60,197 @@ public class MainApp {
                         String email = sc.nextLine();
 
                         int studentId =
-                                studentDAO.addStudentAndReturnId(
-                                        new Student(name, email));
+                                studentDAO.addStudentAndReturnId(new Student(name, email));
 
-                        // ---------- SKILLS ----------
-                        int skillCount;
-                        do {
-                            System.out.print("Number of skills (min 1): ");
-                            skillCount = sc.nextInt();
-                        } while (skillCount <= 0);
-                        sc.nextLine();
+                        System.out.print("Number of skills: ");
+                        int skillCount = Integer.parseInt(sc.nextLine());
 
                         int[] skillIds = new int[skillCount];
-
                         for (int i = 0; i < skillCount; i++) {
-                            System.out.print("Skill " + (i + 1) + " name: ");
-                            String skillName = sc.nextLine();
-                            skillIds[i] = skillDAO.getOrCreateSkill(skillName);
+                            System.out.print("Skill " + (i + 1) + ": ");
+                            skillIds[i] = skillDAO.getOrCreateSkill(sc.nextLine());
                         }
-                        System.out.println("Are you want to enter the certificates 1/0");
-                        Scanner s=new Scanner (System.in);
-                        int n=s.nextInt();
-                        if(n==1){
 
-                        // ---------- CERTIFICATIONS ----------
-                        int certCount;
-                        do {
-                            System.out.print("Number of certifications (min 1): ");
-                            certCount = sc.nextInt();
-                        } while (certCount <= 0);
-                        sc.nextLine();
+                        System.out.print("Add certificates? (1 = Yes / 0 = No): ");
+                        int addCert = Integer.parseInt(sc.nextLine());
 
-                        for (int i = 0; i < certCount; i++) {
+                        if (addCert == 1) {
+                            System.out.print("Number of certificates: ");
+                            int certCount = Integer.parseInt(sc.nextLine());
 
-                            System.out.print("Certification name: ");
-                            String certName = sc.nextLine();
+                            for (int i = 0; i < certCount; i++) {
 
-                            System.out.println("Select skill:");
-                            for (int j = 0; j < skillIds.length; j++) {
-                                System.out.println((j + 1) + ". Skill ID: " + skillIds[j]);
+                                System.out.print("Certificate Name: ");
+                                String certName = sc.nextLine();
+
+                                System.out.println("Select Skill:");
+                                for (int j = 0; j < skillIds.length; j++) {
+                                    System.out.println((j + 1) + ". Skill ID: " + skillIds[j]);
+                                }
+
+                                int skillChoice =
+                                        Integer.parseInt(sc.nextLine()) - 1;
+
+                                System.out.print("Expiry (yyyy-mm-dd) [Enter to skip]: ");
+                                String exp = sc.nextLine();
+
+                                LocalDate expiry =
+                                        exp.isEmpty() ? null : LocalDate.parse(exp);
+
+                                Certification cert = new Certification(
+                                        studentId,
+                                        skillIds[skillChoice],
+                                        certName,
+                                        LocalDate.now(),
+                                        expiry
+                                );
+
+                                certService.issueCertification(cert);
                             }
-
-                            int skillChoice;
-                            do {
-                                System.out.print("Choice: ");
-                                skillChoice = sc.nextInt();
-                            } while (skillChoice < 1 || skillChoice > skillIds.length);
-                            sc.nextLine();
-
-                            LocalDate expiry = null;
-                            System.out.print("Expiry (yyyy-mm-dd) [Enter to skip]: ");
-                            String exp = sc.nextLine();
-                            if (!exp.isEmpty()) {
-                                expiry = LocalDate.parse(exp);
-                            }
-
-                            Certification cert =
-                                    new Certification(
-                                            studentId,
-                                            skillIds[skillChoice - 1],
-                                            certName,
-                                            LocalDate.now(),
-                                            expiry
-                                    );
-
-                            // SERVICE call (correct)
-                            certService.issueCertification(cert);
                         }
-                        System.out.println("Student, skills, and certifications added.");
-                        }
-                        System.out.println("Student, skills added.");
-                     
-                        break;
 
-                    // ---------- VIEW ALL STUDENTS ----------
-                    case 2:
-                        certDAO.viewAllStudentDetails();
-                        break;
+                        System.out.println("Student added successfully");
+                    }
 
-                    // ---------- UPDATE EXPIRY ----------
-                    case 3:
+                    // -------- VIEW ALL --------
+                    case 2 -> certDAO.viewAllStudentDetails();
+
+                    // -------- UPDATE EXPIRY --------
+                    case 3 -> {
                         System.out.print("Student ID: ");
-                        int sid = sc.nextInt();
+                        int sid = Integer.parseInt(sc.nextLine());
 
                         System.out.print("Certificate Name: ");
-                        String certificate_name= sc.nextLine();
-                        sc.nextLine();
+                        String certName = sc.nextLine();
 
                         System.out.print("New Expiry (yyyy-mm-dd) [Enter to remove]: ");
-                        String input = sc.nextLine();
+                        String exp = sc.nextLine();
 
                         LocalDate newExpiry =
-                                input.isEmpty() ? null : LocalDate.parse(input);
+                                exp.isEmpty() ? null : LocalDate.parse(exp);
 
-                        certDAO.updateCertificationExpiry(sid, certificate_name, newExpiry);
-                        System.out.println("Expiry updated.");
-                        break;
+                        certDAO.updateCertificationExpiry(sid, certName, newExpiry);
+                        System.out.println("Expiry updated");
+                    }
 
-                    // ---------- FIND STUDENT ----------
-                    case 4:
+                    // -------- FIND STUDENT --------
+                    case 4 -> {
                         System.out.print("Enter Student ID or Name: ");
-                        String search = sc.nextLine();
-                        certDAO.findStudent(search);
-                        break;
+                        certDAO.findStudent(sc.nextLine());
+                    }
 
-                    // ---------- VIEW EXPIRED CERTIFICATES ----------
-                    case 5:
+                    // -------- EXPIRED CERTS --------
+                    case 5 -> {
                         List<ExpiredCertificateView> expired =
                                 certService.viewExpiredCertificates();
 
-                        System.out.printf(
-                        	    "%-5s %-20s %-35s %-12s%n",
-                        	    "ID", "NAME", "CERTIFICATE", "EXPIRY"
-                        	);
+                        System.out.printf("%-5s %-20s %-35s %-12s%n",
+                                "ID", "NAME", "CERTIFICATE", "EXPIRY");
 
                         LocalDate today = LocalDate.now();
-                        LocalDate soonLimit = today.plusDays(30);
+                        LocalDate soon = today.plusDays(30);
 
                         for (ExpiredCertificateView e : expired) {
-
-                            LocalDate expiry = e.getExpiryDate();
-
-                            // 🔴 EXPIRED
-                            if (expiry.isBefore(today)) {
+                            if (e.getExpiryDate().isBefore(today))
                                 System.out.print(RED);
-
-                            // 🟡 EXPIRING SOON (within 30 days)
-                            } else if (!expiry.isAfter(soonLimit)) {
+                            else if (!e.getExpiryDate().isAfter(soon))
                                 System.out.print(YELLOW);
-                            }
 
-                            System.out.printf(
-                                "%-5d %-20s %-35s %-12s%n",
-                                e.getStudentId(),
-                                e.getStudentName(),
-                                e.getCertificateName(),
-                                expiry
-                            );
+                            System.out.printf("%-5d %-20s %-35s %-12s%n",
+                                    e.getStudentId(),
+                                    e.getStudentName(),
+                                    e.getCertificateName(),
+                                    e.getExpiryDate());
 
                             System.out.print(RESET);
                         }
+                    }
 
+                    // -------- DELETE --------
+                    case 6 -> {
+                        System.out.print("Student ID (Enter to skip): ");
+                        String idStr = sc.nextLine();
 
+                        System.out.print("Student Name (Enter to skip): ");
+                        String nameStr = sc.nextLine();
 
-                        break;
-                        
-                        
-                    case 6:
-                        System.out.print("Enter Student ID (or press Enter to skip): ");
-                        String idInput = sc.nextLine();
+                        Integer id = idStr.isEmpty() ? null : Integer.parseInt(idStr);
+                        String nm = nameStr.isEmpty() ? null : nameStr;
 
-                        System.out.print("Enter Student Name (or press Enter to skip): ");
-                        String nameInput = sc.nextLine();
+                        certDAO.deleteByIdOrName(id, nm);
+                    }
 
-                        Integer id = idInput.isEmpty() ? null : Integer.parseInt(idInput);
-                        String name1 = nameInput.isEmpty() ? null : nameInput;
+                    // -------- ADD SKILL --------
+                    case 7 -> {
+                        System.out.print("Student ID (Enter to skip): ");
+                        String idStr = sc.nextLine();
 
-                        certDAO.deleteByIdOrName(id, name1);
-                        break;
-    
+                        System.out.print("Student Name (Enter to skip): ");
+                        String nameStr = sc.nextLine();
 
-                    case 7:
-                        System.out.println("Exiting...");
+                        Integer id = idStr.isEmpty() ? null : Integer.parseInt(idStr);
+                        String nm = nameStr.isEmpty() ? null : nameStr;
+
+                        System.out.print("Number of skills: ");
+                        int count = Integer.parseInt(sc.nextLine());
+
+                        List<String> skills = new ArrayList<>();
+                        for (int i = 0; i < count; i++) {
+                            System.out.print("Skill " + (i + 1) + ": ");
+                            skills.add(sc.nextLine());
+                        }
+
+                        certDAO.addSkillsToStudent(id, nm, skills);
+                    }
+
+                    // -------- ADD CERTIFICATE --------
+                    case 8 -> {
+                        System.out.print("Student ID (Enter to skip): ");
+                        String idStr = sc.nextLine();
+
+                        System.out.print("Student Name (Enter to skip): ");
+                        String nameStr = sc.nextLine();
+
+                        Integer id = idStr.isEmpty() ? null : Integer.parseInt(idStr);
+                        String nm = nameStr.isEmpty() ? null : nameStr;
+
+                        System.out.print("Number of certificates: ");
+                        int count = Integer.parseInt(sc.nextLine());
+
+                        List<Certification> certs = new ArrayList<>();
+
+                        for (int i = 0; i < count; i++) {
+                            Certification c = new Certification(i, i, nm, null, null);
+
+                            System.out.print("Skill Name: ");
+                            c.setSkillName(sc.nextLine());
+
+                            System.out.print("Certificate Name: ");
+                            c.setCertificateName(sc.nextLine());
+
+                            System.out.print("Expiry (yyyy-mm-dd) [Enter to skip]: ");
+                            String exp = sc.nextLine();
+                            c.setExpiryDate(exp.isEmpty() ? null : LocalDate.parse(exp));
+
+                            certs.add(c);
+                        }
+
+                        certDAO.addCertificatesToStudent(id, nm, certs);
+                    }
+
+                    // -------- EXIT --------
+                    case 9 -> {
+                        System.out.println("Exiting application...");
+                        sc.close();
                         System.exit(0);
+                    }
 
-                    default:
-                        System.out.println("Invalid choice");
+                    default -> System.out.println("Invalid choice");
                 }
 
-            } catch (DataNotFoundException e) {
-
-                System.out.println(e.getMessage());
-
-            } catch (SQLException e) {
-                System.out.println("Database error: " + e.getMessage());
-            }
-
-
+            } catch (DataNotFoundException | SQLException e) {
+                System.out.println("Error: " + e.getMessage());
             }
         }
     }
-
+}
