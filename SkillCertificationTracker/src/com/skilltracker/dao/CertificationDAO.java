@@ -178,4 +178,38 @@ public class CertificationDAO {
             ps.executeUpdate();
         }
     }
+    
+    // 🔥 VIEW EXPIRED CERTIFICATES
+    public void viewExpiredCertificates() throws SQLException {
+
+        String sql =
+          "SELECT st.student_id, st.name, s.skill_name, " +
+          "c.certificate_name, c.expiry_date " +
+          "FROM certifications c " +
+          "JOIN students st ON c.student_id = st.student_id " +
+          "JOIN skills s ON c.skill_id = s.skill_id " +
+          "WHERE c.expiry_date < CURRENT_DATE " +
+          "ORDER BY c.expiry_date";
+
+        try (Connection con = DBUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            System.out.printf(
+                "%-4s %-20s %-20s %-30s %-12s%n",
+                "ID", "Name", "Skill", "Certificate", "Expiry"
+            );
+
+            while (rs.next()) {
+                System.out.printf(
+                    "%-4d %-20s %-20s %-30s %-12s%n",
+                    rs.getInt("student_id"),
+                    rs.getString("name"),
+                    rs.getString("skill_name"),
+                    rs.getString("certificate_name"),
+                    rs.getDate("expiry_date")
+                );
+            }
+        }
+    }
 }

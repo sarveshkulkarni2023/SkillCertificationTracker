@@ -26,7 +26,8 @@ public class MainApp {
             System.out.println("2.View All Students");
             System.out.println("3.Update Certification");
             System.out.println("4.Find a Student");
-            System.out.println("5.Exit");
+            System.out.println("5.View Expired Certificates");
+            System.out.println("6.Exit");
             System.out.print("Choice: ");
 
             int choice = sc.nextInt();
@@ -136,9 +137,12 @@ public class MainApp {
                         String search = sc.nextLine();
                         certDAO.findStudent(search);
                         break;
-
-                    // -------- EXIT --------
+                //------------Find Expired certificates
                     case 5:
+                        certDAO.viewExpiredCertificates();
+                        break;
+                    // -------- EXIT --------
+                    case 6:
                         System.out.println("Exiting...");
                         System.exit(0);
 
