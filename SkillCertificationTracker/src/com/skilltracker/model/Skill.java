@@ -1,6 +1,7 @@
 package com.skilltracker.model;
 
 public class Skill {
+
     private int skillId;
     private String skillName;
 

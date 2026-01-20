@@ -20,7 +20,7 @@ public class CertificationService {
 
         if (cert.getExpiryDate().isBefore(LocalDate.now())) {
             throw new ExpiredCertificationException(
-                "Certification already expired"
+                "Expiry date already passed"
             );
         }
 

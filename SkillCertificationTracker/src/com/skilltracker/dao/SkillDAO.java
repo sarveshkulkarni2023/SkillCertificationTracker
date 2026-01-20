@@ -1,23 +1,39 @@
 package com.skilltracker.dao;
 
-import com.skilltracker.model.Skill;
 import com.skilltracker.util.DBUtil;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.*;
 
 public class SkillDAO {
 
-    public void addSkill(Skill skill) throws SQLException {
-        String sql =
+    public int getOrCreateSkill(String skillName) throws SQLException {
+
+        String select =
+            "SELECT skill_id FROM skills WHERE skill_name = ?";
+        String insert =
             "INSERT INTO skills(skill_name) VALUES (?)";
 
-        try (Connection con = DBUtil.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+        try (Connection con = DBUtil.getConnection()) {
 
-            ps.setString(1, skill.getSkillName());
-            ps.executeUpdate();
+            try (PreparedStatement ps = con.prepareStatement(select)) {
+                ps.setString(1, skillName);
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+
+            try (PreparedStatement ps =
+                     con.prepareStatement(insert,
+                             Statement.RETURN_GENERATED_KEYS)) {
+
+                ps.setString(1, skillName);
+                ps.executeUpdate();
+
+                ResultSet rs = ps.getGeneratedKeys();
+                rs.next();
+                return rs.getInt(1);
+            }
         }
     }
 }

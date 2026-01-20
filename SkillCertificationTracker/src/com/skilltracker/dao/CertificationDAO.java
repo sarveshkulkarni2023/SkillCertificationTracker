@@ -3,11 +3,7 @@ package com.skilltracker.dao;
 import com.skilltracker.model.Certification;
 import com.skilltracker.util.DBUtil;
 
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.LocalDate;
 
 public class CertificationDAO {
@@ -28,33 +24,42 @@ public class CertificationDAO {
             ps.executeUpdate();
         }
     }
-    
-    public void viewSkillsByStudent(int studentId) throws SQLException {
+
+    public void viewAllStudentDetails() throws SQLException {
 
         String sql =
-          "SELECT s.skill_name, c.issue_date, c.expiry_date " +
-          "FROM certifications c " +
-          "JOIN skills s ON c.skill_id = s.skill_id " +
-          "WHERE c.student_id = ?";
+          "SELECT st.student_id, st.name, " +
+          "GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ', ') AS skills, " +
+          "GROUP_CONCAT(DISTINCT DATE_FORMAT(c.expiry_date, '%Y-%m-%d') " +
+          "ORDER BY c.expiry_date SEPARATOR ', ') AS expiry_dates " +
+          "FROM students st " +
+          "LEFT JOIN certifications c ON st.student_id = c.student_id " +
+          "LEFT JOIN skills s ON c.skill_id = s.skill_id " +
+          "GROUP BY st.student_id, st.name " +
+          "ORDER BY st.student_id";
 
         try (Connection con = DBUtil.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
-            ps.setInt(1, studentId);
+            System.out.printf(
+                "%-4s %-20s %-30s %-30s%n",
+                "ID", "Name", "Skills", "Expiry Dates"
+            );
 
-            try (ResultSet rs = ps.executeQuery()) {
-                System.out.println("\n--- Skills ---");
-                while (rs.next()) {
-                    System.out.println(
-                        rs.getString("skill_name") +
-                        " | Issued: " + rs.getDate("issue_date") +
-                        " | Expiry: " + rs.getDate("expiry_date")
-                    );
-                }
+            while (rs.next()) {
+                System.out.printf(
+                    "%-4d %-20s %-30s %-30s%n",
+                    rs.getInt("student_id"),
+                    rs.getString("name"),
+                    rs.getString("skills"),
+                    rs.getString("expiry_dates")
+                );
             }
         }
     }
-    
+
+
     public void updateCertificationExpiry(
             int studentId, int skillId, LocalDate newExpiry)
             throws SQLException {
@@ -70,14 +75,7 @@ public class CertificationDAO {
             ps.setInt(2, studentId);
             ps.setInt(3, skillId);
 
-            int rows = ps.executeUpdate();
-            if (rows == 0) {
-                System.out.println("Certification not found");
-            } else {
-                System.out.println("Certification updated");
-            }
+            ps.executeUpdate();
         }
     }
-
-
 }
