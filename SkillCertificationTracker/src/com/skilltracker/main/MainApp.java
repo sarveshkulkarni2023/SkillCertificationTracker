@@ -166,7 +166,7 @@ public class MainApp {
                         }
                     }
 
-                    // -------- DELETE --------
+                    // -------- call DELETE --------
                     case 6 -> {
                         System.out.print("Student ID (Enter to skip): ");
                         String idStr = sc.nextLine();
