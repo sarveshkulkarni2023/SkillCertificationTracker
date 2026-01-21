@@ -257,7 +257,7 @@ public class CertificationDAO implements ICertificationDAO {
         }
     }
 
-    
+    //Delete by using id or name
     public void deleteByIdOrName(Integer id, String name) throws SQLException {
 
         String selectStudent =
@@ -278,7 +278,7 @@ public class CertificationDAO implements ICertificationDAO {
 
             Integer studentId = null;
 
-            // 1️⃣ Find student
+            // 1️ Find student
             try (PreparedStatement ps = con.prepareStatement(selectStudent)) {
                 ps.setObject(1, id);
                 ps.setObject(2, name);
@@ -295,19 +295,19 @@ public class CertificationDAO implements ICertificationDAO {
                 return;
             }
 
-            // 2️⃣ Delete certifications
+            // 2️ Delete certifications
             try (PreparedStatement ps = con.prepareStatement(deleteCert)) {
                 ps.setInt(1, studentId);
                 ps.executeUpdate();
             }
 
-            // 3️⃣ Delete student_skills
+            // 3️ Delete student_skills
             try (PreparedStatement ps = con.prepareStatement(deleteStudentSkills)) {
                 ps.setInt(1, studentId);
                 ps.executeUpdate();
             }
 
-            // 4️⃣ Delete student
+            // 4️ Delete student
             try (PreparedStatement ps = con.prepareStatement(deleteStudent)) {
                 ps.setInt(1, studentId);
                 ps.executeUpdate();
