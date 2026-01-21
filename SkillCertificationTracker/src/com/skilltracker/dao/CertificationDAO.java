@@ -27,12 +27,11 @@ public class CertificationDAO implements ICertificationDAO {
             ps.setInt(2, cert.getSkillId());
             ps.setString(3, cert.getCertificateName());
             ps.setDate(4, Date.valueOf(cert.getIssueDate()));
-
-            if (cert.getExpiryDate() != null) {
-                ps.setDate(5, Date.valueOf(cert.getExpiryDate()));
-            } else {
-                ps.setNull(5, Types.DATE);
-            }
+            ps.setDate(5,
+                cert.getExpiryDate() != null
+                    ? Date.valueOf(cert.getExpiryDate())
+                    : null
+            );
 
             ps.executeUpdate();
         }
@@ -43,11 +42,12 @@ public class CertificationDAO implements ICertificationDAO {
 
         String sql =
             "SELECT st.student_id, st.name, " +
-            "GROUP_CONCAT(DISTINCT s.skill_name SEPARATOR ', ') AS skills, " +
+            "GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ', ') AS skills, " +
             "GROUP_CONCAT(DISTINCT c.certificate_name SEPARATOR ', ') AS certificates " +
             "FROM students st " +
+            "LEFT JOIN student_skills ss ON st.student_id = ss.student_id " +
+            "LEFT JOIN skills s ON ss.skill_id = s.skill_id " +
             "LEFT JOIN certifications c ON st.student_id = c.student_id " +
-            "LEFT JOIN skills s ON c.skill_id = s.skill_id " +
             "GROUP BY st.student_id, st.name " +
             "ORDER BY st.student_id";
 
@@ -80,8 +80,9 @@ public class CertificationDAO implements ICertificationDAO {
             "GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ', ') AS skills, " +
             "c.certificate_name, c.expiry_date " +
             "FROM students st " +
+            "LEFT JOIN student_skills ss ON st.student_id = ss.student_id " +
+            "LEFT JOIN skills s ON ss.skill_id = s.skill_id " +
             "LEFT JOIN certifications c ON st.student_id = c.student_id " +
-            "LEFT JOIN skills s ON c.skill_id = s.skill_id " +
             "WHERE st.student_id = ? OR st.name LIKE ? " +
             "GROUP BY st.student_id, st.name, st.email, c.certificate_name, c.expiry_date " +
             "ORDER BY st.student_id, c.expiry_date";
@@ -102,48 +103,29 @@ public class CertificationDAO implements ICertificationDAO {
                     return;
                 }
 
-                // HEADER
                 System.out.printf(
-                	    "%-4s %-12s %-25s %-18s %-35s %-12s%n",
-                	    "ID", "NAME", "EMAIL", "SKILL", "CERTIFICATION", "EXPIRY"
-                	);
-
-
-                int lastStudentId = -1;
+                    "%-4s %-15s %-25s %-25s %-30s %-12s%n",
+                    "ID", "NAME", "EMAIL", "SKILLS", "CERTIFICATION", "EXPIRY"
+                );
 
                 do {
-                    int currentId = rs.getInt("student_id");
-
-                    String idCol     = (currentId != lastStudentId) ? String.valueOf(currentId) : "";
-                    String nameCol   = (currentId != lastStudentId) ? rs.getString("name") : "";
-                    String emailCol  = (currentId != lastStudentId) ? rs.getString("email") : "";
-                    String skillCol  = (currentId != lastStudentId) ? rs.getString("skills") : "";
-
-                    String certCol   = rs.getString("certificate_name");
-                    Date expDate     = rs.getDate("expiry_date");
-
                     System.out.printf(
-                    	    "%-4d %-12s %-25s %-18s %-35s %-12s%n",
-                    	    rs.getInt("student_id"),
-                    	    rs.getString("name"),
-                    	    rs.getString("email"),
-                    	    rs.getString("skills"),
-                    	    rs.getString("certificate_name"),
-                    	    rs.getDate("expiry_date")
-                    	);
-
-
-                    lastStudentId = currentId;
-
+                        "%-4d %-15s %-25s %-25s %-30s %-12s%n",
+                        rs.getInt("student_id"),
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getString("skills"),
+                        rs.getString("certificate_name"),
+                        rs.getDate("expiry_date")
+                    );
                 } while (rs.next());
             }
         }
     }
 
-
     // ---------------- UPDATE EXPIRY ----------------
     public void updateCertificationExpiry(
-            int studentId, String certificate_name, LocalDate newExpiry)
+            int studentId, String certificateName, LocalDate newExpiry)
             throws SQLException {
 
         String sql =
@@ -153,19 +135,16 @@ public class CertificationDAO implements ICertificationDAO {
         try (Connection con = DBUtil.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
-            if (newExpiry != null) {
-                ps.setDate(1, Date.valueOf(newExpiry));
-            } else {
-                ps.setNull(1, Types.DATE);
-            }
-
+            ps.setDate(1,
+                newExpiry != null ? Date.valueOf(newExpiry) : null
+            );
             ps.setInt(2, studentId);
-            ps.setString(3, certificate_name);
+            ps.setString(3, certificateName);
             ps.executeUpdate();
         }
     }
 
- // ---------------- EXPIRED CERTIFICATES (SERVICE USES THIS) ----------------
+    // ---------------- EXPIRED CERTIFICATES ----------------
     @Override
     public List<ExpiredCertificateView> getExpiredCertificates() throws SQLException {
 
@@ -196,121 +175,13 @@ public class CertificationDAO implements ICertificationDAO {
         }
         return list;
     }
-    
-    public void deleteByIdOrName(Integer id, String name1) {
 
-        String selectStudent =
-            "SELECT student_id FROM students WHERE student_id = ? OR name = ?";
-
-        String deleteCert =
-            "DELETE FROM certifications WHERE student_id = ?";
-
-        String deleteStudent =
-            "DELETE FROM students WHERE student_id = ?";
-
-        String deleteUnusedSkills =
-            "DELETE FROM skills " +
-            "WHERE skill_id NOT IN (SELECT DISTINCT skill_id FROM certifications)";
-
-        try (Connection con = DBUtil.getConnection()) {
-
-            con.setAutoCommit(false);
-
-            Integer studentId = null;
-
-            // 1️⃣ Find student first
-            try (PreparedStatement ps = con.prepareStatement(selectStudent)) {
-                ps.setObject(1, id);
-                ps.setObject(2, name1);
-
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        studentId = rs.getInt("student_id");
-                    }
-                }
-            }
-
-            if (studentId == null) {
-                System.out.println("Student not found");
-                return;
-            }
-
-            // 2️⃣ Delete certifications
-            try (PreparedStatement ps = con.prepareStatement(deleteCert)) {
-                ps.setInt(1, studentId);
-                ps.executeUpdate();
-            }
-
-            // 3️⃣ Delete student
-            int rows;
-            try (PreparedStatement ps = con.prepareStatement(deleteStudent)) {
-                ps.setInt(1, studentId);
-                rows = ps.executeUpdate();
-            }
-
-            // 4️⃣ Delete unused skills (safe cleanup)
-            try (PreparedStatement ps = con.prepareStatement(deleteUnusedSkills)) {
-                ps.executeUpdate();
-            }
-
-            con.commit();
-
-            if (rows > 0) {
-                System.out.println("Student record deleted successfully");
-            }
-
-        } catch (Exception e) {
-            try {
-                DBUtil.getConnection().rollback();
-            } catch (Exception ignored) {}
-            System.out.println("Delete failed: " + e.getMessage());
-        }
-    }
-    private Integer getStudentId(Connection con, Integer id, String name) throws SQLException {
-
-        String sql = "SELECT student_id FROM students WHERE student_id = ? OR name = ?";
-
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setObject(1, id);
-            ps.setObject(2, name);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("student_id");
-                }
-            }
-        }
-        return null;
-    }
-    private int getOrCreateSkill(Connection con, String skillName) throws SQLException {
-
-        String select = "SELECT skill_id FROM skills WHERE skill_name = ?";
-        String insert = "INSERT INTO skills(skill_name) VALUES(?)";
-
-        try (PreparedStatement ps = con.prepareStatement(select)) {
-            ps.setString(1, skillName);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("skill_id");
-                }
-            }
-        }
-
-        try (PreparedStatement ps =
-                 con.prepareStatement(insert, Statement.RETURN_GENERATED_KEYS)) {
-
-            ps.setString(1, skillName);
-            ps.executeUpdate();
-
-            try (ResultSet rs = ps.getGeneratedKeys()) {
-                rs.next();
-                return rs.getInt(1);
-            }
-        }
-    }
+    // ---------------- ADD SKILLS TO STUDENT ----------------
     public void addSkillsToStudent(Integer id, String name, List<String> skills)
             throws SQLException {
+
+        String insert =
+            "INSERT IGNORE INTO student_skills (student_id, skill_id) VALUES (?, ?)";
 
         try (Connection con = DBUtil.getConnection()) {
 
@@ -321,13 +192,20 @@ public class CertificationDAO implements ICertificationDAO {
             }
 
             for (String skill : skills) {
-                getOrCreateSkill(con, skill);
+                int skillId = getOrCreateSkill(con, skill);
+
+                try (PreparedStatement ps = con.prepareStatement(insert)) {
+                    ps.setInt(1, studentId);
+                    ps.setInt(2, skillId);
+                    ps.executeUpdate();
+                }
             }
 
             System.out.println("Skills added successfully");
         }
     }
 
+    // ---------------- ADD CERTIFICATES TO STUDENT ----------------
     public void addCertificatesToStudent(
             Integer id, String name,
             List<Certification> certs) throws SQLException {
@@ -349,10 +227,18 @@ public class CertificationDAO implements ICertificationDAO {
 
             for (Certification cert : certs) {
 
-                int skillId = getOrCreateSkill(con, cert.getCertificateName());
+                int skillId = getOrCreateSkill(con, cert.getSkillName());
+
+                // ensure student-skill mapping
+                try (PreparedStatement ps =
+                         con.prepareStatement(
+                             "INSERT IGNORE INTO student_skills VALUES (?, ?)")) {
+                    ps.setInt(1, studentId);
+                    ps.setInt(2, skillId);
+                    ps.executeUpdate();
+                }
 
                 try (PreparedStatement ps = con.prepareStatement(insert)) {
-
                     ps.setInt(1, studentId);
                     ps.setInt(2, skillId);
                     ps.setString(3, cert.getCertificateName());
@@ -362,7 +248,6 @@ public class CertificationDAO implements ICertificationDAO {
                             ? Date.valueOf(cert.getExpiryDate())
                             : null
                     );
-
                     ps.executeUpdate();
                 }
             }
@@ -372,4 +257,112 @@ public class CertificationDAO implements ICertificationDAO {
         }
     }
 
+    
+    public void deleteByIdOrName(Integer id, String name) throws SQLException {
+
+        String selectStudent =
+            "SELECT student_id FROM students WHERE student_id = ? OR name = ?";
+
+        String deleteCert =
+            "DELETE FROM certifications WHERE student_id = ?";
+
+        String deleteStudentSkills =
+            "DELETE FROM student_skills WHERE student_id = ?";
+
+        String deleteStudent =
+            "DELETE FROM students WHERE student_id = ?";
+
+        try (Connection con = DBUtil.getConnection()) {
+
+            con.setAutoCommit(false);
+
+            Integer studentId = null;
+
+            // 1️⃣ Find student
+            try (PreparedStatement ps = con.prepareStatement(selectStudent)) {
+                ps.setObject(1, id);
+                ps.setObject(2, name);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        studentId = rs.getInt("student_id");
+                    }
+                }
+            }
+
+            if (studentId == null) {
+                System.out.println("Student not found");
+                return;
+            }
+
+            // 2️⃣ Delete certifications
+            try (PreparedStatement ps = con.prepareStatement(deleteCert)) {
+                ps.setInt(1, studentId);
+                ps.executeUpdate();
+            }
+
+            // 3️⃣ Delete student_skills
+            try (PreparedStatement ps = con.prepareStatement(deleteStudentSkills)) {
+                ps.setInt(1, studentId);
+                ps.executeUpdate();
+            }
+
+            // 4️⃣ Delete student
+            try (PreparedStatement ps = con.prepareStatement(deleteStudent)) {
+                ps.setInt(1, studentId);
+                ps.executeUpdate();
+            }
+
+            con.commit();
+            System.out.println("Student record deleted successfully");
+
+        } catch (Exception e) {
+            System.out.println("Delete failed: " + e.getMessage());
+        }
+    }
+
+    
+    // ---------------- HELPER METHODS ----------------
+    private Integer getStudentId(Connection con, Integer id, String name)
+            throws SQLException {
+
+        String sql =
+            "SELECT student_id FROM students WHERE student_id = ? OR name = ?";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setObject(1, id);
+            ps.setObject(2, name);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt("student_id");
+            }
+        }
+        return null;
+    }
+
+    private int getOrCreateSkill(Connection con, String skillName)
+            throws SQLException {
+
+        String select = "SELECT skill_id FROM skills WHERE skill_name = ?";
+        String insert = "INSERT INTO skills(skill_name) VALUES(?)";
+
+        try (PreparedStatement ps = con.prepareStatement(select)) {
+            ps.setString(1, skillName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt("skill_id");
+            }
+        }
+
+        try (PreparedStatement ps =
+                 con.prepareStatement(insert, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setString(1, skillName);
+            ps.executeUpdate();
+
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
+    }
 }

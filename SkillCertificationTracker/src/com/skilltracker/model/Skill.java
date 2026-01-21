@@ -8,7 +8,7 @@ public class Skill {
     public Skill(String skillName) {
         this.skillName = skillName;
     }
-
+//getters
     public int getSkillId() {
         return skillId;
     }
